@@ -1,9 +1,10 @@
 package com.Tribulla.thermodynamica.debug;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public class VariableHeatBlockEntity extends BlockEntity {
 
@@ -23,16 +24,14 @@ public class VariableHeatBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
-        tag.putDouble("Temperature", temperature);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        output.putDouble("Temperature", temperature);
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
-        if (tag.contains("Temperature")) {
-            temperature = tag.getDouble("Temperature");
-        }
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        temperature = input.getDoubleOr("Temperature", 100.0);
     }
 }

@@ -6,7 +6,7 @@ import com.Tribulla.thermodynamica.network.DebugInfoPacket;
 import com.Tribulla.thermodynamica.network.HeatNetwork;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -14,7 +14,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public class HeatInspectorItem extends Item {
 
@@ -27,7 +27,7 @@ public class HeatInspectorItem extends Item {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
 
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
 
@@ -41,7 +41,7 @@ public class HeatInspectorItem extends Item {
         }
 
         BlockState state = level.getBlockState(pos);
-        ResourceLocation blockId = state.getBlock().builtInRegistryHolder().key().location();
+        Identifier blockId = state.getBlock().builtInRegistryHolder().key().identifier();
 
         HeatAPI api = HeatAPI.get();
 
@@ -60,8 +60,8 @@ public class HeatInspectorItem extends Item {
         player.sendSystemMessage(
                 Component.literal(String.format("§7Biome Offset: §f%.1f °C", api.getBiomeOffset(level, pos))));
 
-        HeatNetwork.CHANNEL.send(
-                PacketDistributor.PLAYER.with(() -> player),
+        PacketDistributor.sendToPlayer(
+                player,
                 new DebugInfoPacket(pos, blockId.toString(), celsius,
                         props.getConductivity(), props.getDissipationRate()));
 

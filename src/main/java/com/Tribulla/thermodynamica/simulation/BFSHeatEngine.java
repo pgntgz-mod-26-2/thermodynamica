@@ -10,12 +10,12 @@ import com.Tribulla.thermodynamica.config.SimulationSettings;
 import com.Tribulla.thermodynamica.config.ThermalPropertiesRegistry;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -91,17 +91,17 @@ public class BFSHeatEngine {
             ThermalProperties.defaults().getDissipationRate(),
             false, false);
 
-    private final ConcurrentHashMap<ResourceLocation, ConcurrentHashMap<Long, CachedProps>> propsCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, ConcurrentHashMap<Long, CachedProps>> propsCache = new ConcurrentHashMap<>();
 
     private final MinecraftServer server;
     private final HeatConfigManager configManager;
     private final SimulationSettings settings;
 
-    private final ConcurrentHashMap<ResourceLocation, ConcurrentHashMap<Long, AtomicCell>> grids = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, ConcurrentHashMap<Long, AtomicCell>> grids = new ConcurrentHashMap<>();
 
-    private final ConcurrentHashMap<ResourceLocation, ConcurrentHashMap<Long, Set<Long>>> chunkCellMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, ConcurrentHashMap<Long, Set<Long>>> chunkCellMap = new ConcurrentHashMap<>();
 
-    private final ConcurrentHashMap<ResourceLocation, Set<Long>> dirtyCells = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, Set<Long>> dirtyCells = new ConcurrentHashMap<>();
 
     private volatile ConcurrentLinkedQueue<Long> frontier = new ConcurrentLinkedQueue<>();
     private volatile Set<Long> frontierSet = ConcurrentHashMap.newKeySet();
@@ -111,9 +111,9 @@ public class BFSHeatEngine {
 
     private volatile Set<Long> stepFrontierSnapshot = ConcurrentHashMap.newKeySet();
 
-    private final ConcurrentHashMap<Long, ResourceLocation> positionDimensions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Identifier> positionDimensions = new ConcurrentHashMap<>();
 
-    private final ConcurrentHashMap<ResourceLocation, ConcurrentHashMap<Long, Double>> sourceTemps = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, ConcurrentHashMap<Long, Double>> sourceTemps = new ConcurrentHashMap<>();
 
     private ForkJoinPool pool;
 
@@ -333,8 +333,8 @@ public class BFSHeatEngine {
 
     public void saveToNBT(CompoundTag tag) {
         CompoundTag dimsTag = new CompoundTag();
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, AtomicCell>> dimEntry : grids.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, AtomicCell>> dimEntry : grids.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             ListTag cellList = new ListTag();
             for (Map.Entry<Long, AtomicCell> cellEntry : dimEntry.getValue().entrySet()) {
                 CompoundTag cellTag = new CompoundTag();
@@ -347,8 +347,8 @@ public class BFSHeatEngine {
         tag.put("Grids", dimsTag);
 
         CompoundTag sourcesTag = new CompoundTag();
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, Double>> dimEntry : sourceTemps.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, Double>> dimEntry : sourceTemps.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             ListTag cellList = new ListTag();
             for (Map.Entry<Long, Double> cellEntry : dimEntry.getValue().entrySet()) {
                 CompoundTag cellTag = new CompoundTag();
@@ -363,16 +363,16 @@ public class BFSHeatEngine {
 
     public void loadFromNBT(CompoundTag tag) {
         if (tag.contains("Grids")) {
-            CompoundTag dimsTag = tag.getCompound("Grids");
-            for (String dimKey : dimsTag.getAllKeys()) {
-                ResourceLocation dim = ResourceLocation.tryParse(dimKey);
+            CompoundTag dimsTag = tag.getCompoundOrEmpty("Grids");
+            for (String dimKey : dimsTag.keySet()) {
+                Identifier dim = Identifier.tryParse(dimKey);
                 if (dim == null) continue;
-                ListTag cellList = dimsTag.getList(dimKey, 10);
+                ListTag cellList = dimsTag.getListOrEmpty(dimKey);
                 ConcurrentHashMap<Long, AtomicCell> grid = grids.computeIfAbsent(dim, k -> new ConcurrentHashMap<>());
                 for (int i = 0; i < cellList.size(); i++) {
-                    CompoundTag cellTag = cellList.getCompound(i);
-                    long pos = cellTag.getLong("Pos");
-                    double temp = cellTag.getDouble("Temp");
+                    CompoundTag cellTag = cellList.getCompoundOrEmpty(i);
+                    long pos = cellTag.getLongOr("Pos", 0L);
+                    double temp = cellTag.getDoubleOr("Temp", 0.0);
                     grid.put(pos, new AtomicCell(temp, 0.0));
                     positionDimensions.putIfAbsent(pos, dim);
                     trackCellInChunk(dim, pos);
@@ -381,17 +381,17 @@ public class BFSHeatEngine {
         }
 
         if (tag.contains("Sources")) {
-            CompoundTag sourcesTag = tag.getCompound("Sources");
-            for (String dimKey : sourcesTag.getAllKeys()) {
-                ResourceLocation dim = ResourceLocation.tryParse(dimKey);
+            CompoundTag sourcesTag = tag.getCompoundOrEmpty("Sources");
+            for (String dimKey : sourcesTag.keySet()) {
+                Identifier dim = Identifier.tryParse(dimKey);
                 if (dim == null) continue;
-                ListTag cellList = sourcesTag.getList(dimKey, 10);
+                ListTag cellList = sourcesTag.getListOrEmpty(dimKey);
                 ConcurrentHashMap<Long, Double> dimSources = sourceTemps.computeIfAbsent(dim,
                         k -> new ConcurrentHashMap<>());
                 for (int i = 0; i < cellList.size(); i++) {
-                    CompoundTag cellTag = cellList.getCompound(i);
-                    long pos = cellTag.getLong("Pos");
-                    double temp = cellTag.getDouble("Temp");
+                    CompoundTag cellTag = cellList.getCompoundOrEmpty(i);
+                    long pos = cellTag.getLongOr("Pos", 0L);
+                    double temp = cellTag.getDoubleOr("Temp", 0.0);
                     dimSources.put(pos, temp);
                     if (frontierSet.add(pos)) frontier.add(pos);
                     positionDimensions.putIfAbsent(pos, dim);
@@ -401,13 +401,13 @@ public class BFSHeatEngine {
         }
     }
 
-    public java.util.Map<ResourceLocation, ConcurrentHashMap<Long, Double>> getSourceTemps() {
+    public java.util.Map<Identifier, ConcurrentHashMap<Long, Double>> getSourceTemps() {
         return sourceTemps;
     }
 
     private void injectSources() {
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, Double>> dimEntry : sourceTemps.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, Double>> dimEntry : sourceTemps.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
 
             for (Map.Entry<Long, Double> srcEntry : dimEntry.getValue().entrySet()) {
@@ -455,8 +455,8 @@ public class BFSHeatEngine {
         }
     }
 
-    private void trackCellInChunk(ResourceLocation dim, long pos) {
-        long chunkPos = ChunkPos.asLong(BlockPos.getX(pos) >> 4, BlockPos.getZ(pos) >> 4);
+    private void trackCellInChunk(Identifier dim, long pos) {
+        long chunkPos = ChunkPos.pack(BlockPos.getX(pos) >> 4, BlockPos.getZ(pos) >> 4);
         chunkCellMap.computeIfAbsent(dim, k -> new ConcurrentHashMap<>())
                 .computeIfAbsent(chunkPos, k -> ConcurrentHashMap.newKeySet())
                 .add(pos);
@@ -464,7 +464,7 @@ public class BFSHeatEngine {
 
     private void resolvePropertiesForTick(List<Long> frontierPositions) {
         for (long packedPos : frontierPositions) {
-            ResourceLocation dim = positionDimensions.get(packedPos);
+            Identifier dim = positionDimensions.get(packedPos);
             if (dim == null)
                 continue;
 
@@ -489,7 +489,7 @@ public class BFSHeatEngine {
         }
     }
 
-    private CachedProps resolveProps(ResourceLocation dim, long packedPos) {
+    private CachedProps resolveProps(Identifier dim, long packedPos) {
         ServerLevel level = getLevelForDim(dim);
         if (level == null)
             return DEFAULT_PROPS;
@@ -509,7 +509,7 @@ public class BFSHeatEngine {
                 return water ? WATER_PROPS : AIR_PROPS;
             }
 
-            ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+            Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
             ThermalPropertiesRegistry registry = configManager.getThermalPropertiesRegistry();
 
             if (registry != null && blockId != null) {
@@ -525,7 +525,7 @@ public class BFSHeatEngine {
         }
     }
 
-    private CachedProps getCachedProps(ResourceLocation dim, long packedPos) {
+    private CachedProps getCachedProps(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, CachedProps> dimCache = propsCache.get(dim);
         if (dimCache == null)
             return DEFAULT_PROPS;
@@ -534,7 +534,7 @@ public class BFSHeatEngine {
     }
 
     // Centralized helper to fire TemperatureChangeEvent with biome offset and safety checks.
-    private void fireTemperatureChange(ResourceLocation dim, long packedPos, double oldTemp, double newTemp) {
+    private void fireTemperatureChange(Identifier dim, long packedPos, double oldTemp, double newTemp) {
         if (Math.abs(newTemp - oldTemp) <= deltaThreshold) return;
         HeatAPI api = HeatAPI.get();
         if (!(api instanceof HeatAPIImpl apiImpl)) return;
@@ -551,7 +551,7 @@ public class BFSHeatEngine {
 
     private void computeBatch(long[] batch, Set<Long> currentFrontier) {
         for (long packedPos : batch) {
-            ResourceLocation dim = positionDimensions.get(packedPos);
+            Identifier dim = positionDimensions.get(packedPos);
             if (dim == null)
                 continue;
 
@@ -623,7 +623,7 @@ public class BFSHeatEngine {
         }
     }
 
-    private void applyFourierConduction(ResourceLocation dim, long fromPacked, long toPacked,
+    private void applyFourierConduction(Identifier dim, long fromPacked, long toPacked,
             AtomicCell fromCell, AtomicCell toCell, double kFrom, double cpFrom,
             double kTo, double cpTo, double tempDiff) {
 
@@ -657,7 +657,7 @@ public class BFSHeatEngine {
         dimDirty.add(fromPacked);
     }
 
-    private void applyNewtonianCooling(ResourceLocation dim, long packedPos, AtomicCell myCell, double myTemp, double myCp, double h, boolean isWater) {
+    private void applyNewtonianCooling(Identifier dim, long packedPos, AtomicCell myCell, double myTemp, double myCp, double h, boolean isWater) {
 
         double tempDiff = myTemp - ambientTemp;
         if (Math.abs(tempDiff) < deltaThreshold * 0.5)
@@ -689,8 +689,8 @@ public class BFSHeatEngine {
         int changed = 0;
         List<Long> toEvict = null;
 
-        for (Map.Entry<ResourceLocation, Set<Long>> dimEntry : dirtyCells.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, Set<Long>> dimEntry : dirtyCells.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             Set<Long> dirties = dimEntry.getValue();
             ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
 
@@ -758,7 +758,7 @@ public class BFSHeatEngine {
                     if (dimCache != null)
                         dimCache.remove(pos);
 
-                    long chunkPos = ChunkPos.asLong(BlockPos.getX(pos) >> 4, BlockPos.getZ(pos) >> 4);
+                    long chunkPos = ChunkPos.pack(BlockPos.getX(pos) >> 4, BlockPos.getZ(pos) >> 4);
                     ConcurrentHashMap<Long, Set<Long>> chunks = chunkCellMap.get(dim);
                     if (chunks != null) {
                         Set<Long> cells = chunks.get(chunkPos);
@@ -773,15 +773,15 @@ public class BFSHeatEngine {
         return changed;
     }
 
-    private ServerLevel getLevelForDim(ResourceLocation dim) {
+    private ServerLevel getLevelForDim(Identifier dim) {
         for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension().location().equals(dim))
+            if (level.dimension().identifier().equals(dim))
                 return level;
         }
         return null;
     }
 
-    public double getTemperature(ResourceLocation dim, long packedPos) {
+    public double getTemperature(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
         if (grid == null)
             return ambientTemp;
@@ -789,7 +789,7 @@ public class BFSHeatEngine {
         return cell != null ? cell.getCurrent() : ambientTemp;
     }
 
-    public OptionalDouble getExactTemperature(ResourceLocation dim, long packedPos) {
+    public OptionalDouble getExactTemperature(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
         if (grid == null)
             return OptionalDouble.empty();
@@ -797,7 +797,7 @@ public class BFSHeatEngine {
         return cell != null ? OptionalDouble.of(cell.getCurrent()) : OptionalDouble.empty();
     }
 
-    public void addSource(ResourceLocation dim, long packedPos, double temperature) {
+    public void addSource(Identifier dim, long packedPos, double temperature) {
         sourceTemps.computeIfAbsent(dim, k -> new ConcurrentHashMap<>())
                 .put(packedPos, temperature);
 
@@ -817,11 +817,11 @@ public class BFSHeatEngine {
         fireTemperatureChange(dim, packedPos, oldTemp, temperature);
     }
 
-    public void updateSource(ResourceLocation dim, long packedPos, double temperature) {
+    public void updateSource(Identifier dim, long packedPos, double temperature) {
         addSource(dim, packedPos, temperature);
     }
 
-    public void setCellTemperature(ResourceLocation dim, long packedPos, double temperature) {
+    public void setCellTemperature(Identifier dim, long packedPos, double temperature) {
         ConcurrentHashMap<Long, AtomicCell> grid = grids.computeIfAbsent(dim,
                 k -> new ConcurrentHashMap<>());
         AtomicCell cell = grid.computeIfAbsent(packedPos, k -> new AtomicCell(ambientTemp, 0.0));
@@ -845,7 +845,7 @@ public class BFSHeatEngine {
         fireTemperatureChange(dim, packedPos, oldTemp, temperature);
     }
 
-    public void removeSource(ResourceLocation dim, long packedPos) {
+    public void removeSource(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, Double> dimSources = sourceTemps.get(dim);
         if (dimSources != null) {
             dimSources.remove(packedPos);
@@ -868,7 +868,7 @@ public class BFSHeatEngine {
         dirtyCells.computeIfAbsent(dim, k -> ConcurrentHashMap.newKeySet()).add(packedPos);
     }
 
-    public void clearChunk(ResourceLocation dim, int chunkX, int chunkZ) {
+    public void clearChunk(Identifier dim, int chunkX, int chunkZ) {
         ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
         ConcurrentHashMap<Long, Double> dimSources = sourceTemps.get(dim);
         ConcurrentHashMap<Long, CachedProps> dimCache = propsCache.get(dim);
@@ -878,7 +878,7 @@ public class BFSHeatEngine {
         if (grid == null && dimSources == null)
             return;
 
-        long chunkPosAsLong = ChunkPos.asLong(chunkX, chunkZ);
+        long chunkPosAsLong = ChunkPos.pack(chunkX, chunkZ);
 
         Set<Long> cellsInChunk = (chunkCells != null) ? chunkCells.remove(chunkPosAsLong) : null;
 
@@ -899,7 +899,7 @@ public class BFSHeatEngine {
         }
     }
 
-    public Map<BlockPos, Double> getChunkTemperatures(ResourceLocation dim, int chunkX, int chunkZ) {
+    public Map<BlockPos, Double> getChunkTemperatures(Identifier dim, int chunkX, int chunkZ) {
         ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
         if (grid == null)
             return Collections.emptyMap();
@@ -908,7 +908,7 @@ public class BFSHeatEngine {
         if (dimChunks == null)
             return Collections.emptyMap();
 
-        long chunkKey = ChunkPos.asLong(chunkX, chunkZ);
+        long chunkKey = ChunkPos.pack(chunkX, chunkZ);
         Set<Long> cellsInChunk = dimChunks.get(chunkKey);
         if (cellsInChunk == null || cellsInChunk.isEmpty())
             return Collections.emptyMap();
@@ -923,7 +923,7 @@ public class BFSHeatEngine {
         return result;
     }
 
-    public void invalidateCache(ResourceLocation dim, long packedPos) {
+    public void invalidateCache(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, CachedProps> dimCache = propsCache.get(dim);
         if (dimCache != null)
             dimCache.remove(packedPos);
@@ -936,7 +936,7 @@ public class BFSHeatEngine {
      * the new block — without this, a hot neighbor in steady state never notices the
      * change and a freshly placed block keeps being treated as the air it replaced.
      */
-    public void onBlockChanged(ResourceLocation dim, long packedPos) {
+    public void onBlockChanged(Identifier dim, long packedPos) {
         ConcurrentHashMap<Long, CachedProps> dimCache = propsCache.get(dim);
         if (dimCache != null)
             dimCache.remove(packedPos);
@@ -962,8 +962,8 @@ public class BFSHeatEngine {
     }
 
     private void trimPropsCache() {
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, CachedProps>> dimEntry : propsCache.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, CachedProps>> dimEntry : propsCache.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             ConcurrentHashMap<Long, CachedProps> dimCache = dimEntry.getValue();
             ConcurrentHashMap<Long, AtomicCell> grid = grids.get(dim);
 

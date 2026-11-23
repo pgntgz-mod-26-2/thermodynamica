@@ -1,40 +1,41 @@
 package com.Tribulla.thermodynamica.debug;
 
 import com.Tribulla.thermodynamica.Thermodynamica;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
 public class DebugRegistry {
 
-    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS,
-            Thermodynamica.MODID);
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS,
-            Thermodynamica.MODID);
-    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES,
-            Thermodynamica.MODID);
+    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Thermodynamica.MODID);
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Thermodynamica.MODID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(
+            Registries.BLOCK_ENTITY_TYPE, Thermodynamica.MODID);
 
-    public static final RegistryObject<Block> VARIABLE_HEAT_BLOCK = BLOCKS.register("variable_heat_block",
-            () -> new VariableHeatBlock(BlockBehaviour.Properties.of()
+    public static final DeferredBlock<Block> VARIABLE_HEAT_BLOCK = BLOCKS.registerBlock("variable_heat_block",
+            props -> new VariableHeatBlock(props
                     .mapColor(MapColor.COLOR_RED)
                     .strength(1.5f)
                     .noOcclusion()));
 
-    public static final RegistryObject<Item> VARIABLE_HEAT_ITEM = ITEMS.register("variable_heat_block",
-            () -> new BlockItem(VARIABLE_HEAT_BLOCK.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> VARIABLE_HEAT_ITEM = ITEMS.registerSimpleBlockItem("variable_heat_block",
+            VARIABLE_HEAT_BLOCK);
 
-    public static final RegistryObject<BlockEntityType<VariableHeatBlockEntity>> VARIABLE_HEAT_BLOCK_ENTITY = BLOCK_ENTITIES.register("variable_heat_block",
-            () -> BlockEntityType.Builder.of(VariableHeatBlockEntity::new, VARIABLE_HEAT_BLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<VariableHeatBlockEntity>> VARIABLE_HEAT_BLOCK_ENTITY = BLOCK_ENTITIES.register(
+            "variable_heat_block",
+            () -> new BlockEntityType<>(VariableHeatBlockEntity::new, VARIABLE_HEAT_BLOCK.get()));
 
-    public static final RegistryObject<Item> HEAT_INSPECTOR = ITEMS.register("heat_inspector",
-            () -> new HeatInspectorItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> HEAT_INSPECTOR = ITEMS.registerItem("heat_inspector",
+            props -> new HeatInspectorItem(props.stacksTo(1)));
 
     public static void register(IEventBus modBus) {
         BLOCKS.register(modBus);

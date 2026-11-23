@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "thermodynamica:item/heat_inspector"
+  }
+}

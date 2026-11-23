@@ -5,30 +5,28 @@ import com.Tribulla.thermodynamica.api.compat.ValkyrienSkiesCompat;
 import com.Tribulla.thermodynamica.config.SimulationSettings;
 import com.Tribulla.thermodynamica.simulation.HeatSimulationManager;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = Thermodynamica.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = Thermodynamica.MODID)
 public class HeatSyncManager {
 
     private static final ConcurrentHashMap<ServerPlayer, Map<BlockPos, Double>> lastSynced = new ConcurrentHashMap<>();
     private static int syncTimer = 0;
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END)
-            return;
+    public static void onServerTick(ServerTickEvent.Post event) {
 
         Thermodynamica instance = Thermodynamica.getInstance();
         if (instance == null || instance.getSimulationManager() == null)
@@ -47,7 +45,7 @@ public class HeatSyncManager {
 
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             int configuredRange = settings.getSyncRange();
-            int serverViewRange = Math.max(2, player.server.getPlayerList().getViewDistance()) * 16;
+            int serverViewRange = Math.max(2, event.getServer().getPlayerList().getViewDistance()) * 16;
             int effectiveRange = Math.max(configuredRange, serverViewRange);
             syncToPlayer(player, sim, threshold, effectiveRange, debug);
         }
@@ -55,17 +53,17 @@ public class HeatSyncManager {
 
     private static void syncToPlayer(ServerPlayer player, HeatSimulationManager sim,
             double threshold, int range, boolean debug) {
-        ServerLevel level = player.serverLevel();
-        ResourceLocation dim = level.dimension().location();
+        ServerLevel level = player.level();
+        Identifier dim = level.dimension().identifier();
         BlockPos playerPos = player.blockPosition();
         Vec3 playerWorldPos = player.position();
-        ChunkPos playerChunk = new ChunkPos(playerPos);
+        ChunkPos playerChunk = ChunkPos.containing(playerPos);
         int chunkRange = (range >> 4) + 1;
 
         Map<BlockPos, Double> playerLastSynced = lastSynced.computeIfAbsent(player, p -> new HashMap<>());
 
-        for (int cx = playerChunk.x - chunkRange; cx <= playerChunk.x + chunkRange; cx++) {
-            for (int cz = playerChunk.z - chunkRange; cz <= playerChunk.z + chunkRange; cz++) {
+        for (int cx = playerChunk.x() - chunkRange; cx <= playerChunk.x() + chunkRange; cx++) {
+            for (int cz = playerChunk.z() - chunkRange; cz <= playerChunk.z() + chunkRange; cz++) {
                 Map<BlockPos, Double> temps = sim.getChunkTemperatures(dim, cx, cz);
                 if (temps.isEmpty())
                     continue;
@@ -88,8 +86,8 @@ public class HeatSyncManager {
                 }
 
                 if (!toSync.isEmpty()) {
-                    HeatNetwork.CHANNEL.send(
-                            PacketDistributor.PLAYER.with(() -> player),
+                    PacketDistributor.sendToPlayer(
+                            player,
                             new ChunkHeatSyncPacket(new ChunkPos(cx, cz), toSync));
                 }
             }
@@ -98,12 +96,12 @@ public class HeatSyncManager {
         syncShipHeatToPlayer(player, sim, dim, playerWorldPos, threshold, range, debug, playerLastSynced);
     }
 
-    private static void syncShipHeatToPlayer(ServerPlayer player, HeatSimulationManager sim, ResourceLocation dim,
+    private static void syncShipHeatToPlayer(ServerPlayer player, HeatSimulationManager sim, Identifier dim,
             Vec3 playerWorldPos, double threshold, int range, boolean debug, Map<BlockPos, Double> playerLastSynced) {
         int chunkRange = (range >> 4) + 1;
         double rangeSq = (double) range * range;
 
-        for (Object ship : ValkyrienSkiesCompat.getAllLoadedShips(player.serverLevel())) {
+        for (Object ship : ValkyrienSkiesCompat.getAllLoadedShips(player.level())) {
             Vec3 shipLocalPlayerPos = ValkyrienSkiesCompat.toShipCoordinatesWithShip(ship, playerWorldPos);
             BlockPos shipPlayerBlockPos = BlockPos.containing(shipLocalPlayerPos);
             int centerChunkX = shipPlayerBlockPos.getX() >> 4;
@@ -137,8 +135,8 @@ public class HeatSyncManager {
                     }
 
                     if (!toSync.isEmpty()) {
-                        HeatNetwork.CHANNEL.send(
-                                PacketDistributor.PLAYER.with(() -> player),
+                        PacketDistributor.sendToPlayer(
+                                player,
                                 new ChunkHeatSyncPacket(new ChunkPos(cx, cz), toSync));
                     }
                 }

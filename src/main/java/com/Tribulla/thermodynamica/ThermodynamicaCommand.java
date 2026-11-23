@@ -10,7 +10,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 public class ThermodynamicaCommand {
@@ -22,7 +22,7 @@ public class ThermodynamicaCommand {
 
         private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> buildRoot(String name) {
                 return Commands.literal(name)
-                                .requires(source -> source.hasPermission(2))
+                                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                                 .then(Commands.literal("tps")
                                                 .executes(ThermodynamicaCommand::executeTps))
                                 .then(Commands.literal("status")
@@ -166,7 +166,7 @@ public class ThermodynamicaCommand {
                 }
 
                 BlockPos pos = player.blockPosition();
-                ResourceLocation dim = player.level().dimension().location();
+                Identifier dim = player.level().dimension().identifier();
 
                 String debugInfo = sim.getNearestSourceDebug(dim, pos);
 

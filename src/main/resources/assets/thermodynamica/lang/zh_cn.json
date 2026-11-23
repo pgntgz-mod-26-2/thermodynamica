@@ -1,0 +1,16 @@
+{
+  "itemGroup.thermodynamica_tab": "热力学 (Thermodynamica)",
+  "block.thermodynamica.variable_heat_block": "可变热源方块",
+  "block.thermodynamica.heat_source_neg5": "热源 [NEG5] (-200°C)",
+  "block.thermodynamica.heat_source_neg4": "热源 [NEG4] (-150°C)",
+  "block.thermodynamica.heat_source_neg3": "热源 [NEG3] (-100°C)",
+  "block.thermodynamica.heat_source_neg2": "热源 [NEG2] (-50°C)",
+  "block.thermodynamica.heat_source_neg1": "热源 [NEG1] (-20°C)",
+  "block.thermodynamica.heat_source_zero": "热源 [ZERO] (0°C)",
+  "block.thermodynamica.heat_source_pos1": "热源 [POS1] (20°C)",
+  "block.thermodynamica.heat_source_pos2": "热源 [POS2] (100°C)",
+  "block.thermodynamica.heat_source_pos3": "热源 [POS3] (500°C)",
+  "block.thermodynamica.heat_source_pos4": "热源 [POS4] (1000°C)",
+  "block.thermodynamica.heat_source_pos5": "热源 [POS5] (3000°C)",
+  "item.thermodynamica.heat_inspector": "热量检测仪"
+}

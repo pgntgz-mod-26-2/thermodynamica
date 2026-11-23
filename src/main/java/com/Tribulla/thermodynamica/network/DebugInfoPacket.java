@@ -1,29 +1,33 @@
 package com.Tribulla.thermodynamica.network;
 
+import com.Tribulla.thermodynamica.Thermodynamica;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.function.Supplier;
+public record DebugInfoPacket(
+        BlockPos pos,
+        String blockName,
+        double celsius,
+        double conductivity,
+        double dissipationRate) implements CustomPacketPayload {
 
-public class DebugInfoPacket {
+    public static final Type<DebugInfoPacket> TYPE = new Type<>(
+            Identifier.fromNamespaceAndPath(Thermodynamica.MODID, "debug_info"));
 
-    private final BlockPos pos;
-    private final String blockName;
-    private final double celsius;
-    private final double conductivity;
-    private final double dissipationRate;
+    public static final StreamCodec<FriendlyByteBuf, DebugInfoPacket> STREAM_CODEC = StreamCodec.of(
+            DebugInfoPacket::encode,
+            DebugInfoPacket::decode);
 
-    public DebugInfoPacket(BlockPos pos, String blockName, double celsius,
-            double conductivity, double dissipationRate) {
-        this.pos = pos;
-        this.blockName = blockName;
-        this.celsius = celsius;
-        this.conductivity = conductivity;
-        this.dissipationRate = dissipationRate;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public static void encode(DebugInfoPacket packet, FriendlyByteBuf buf) {
+    public static void encode(FriendlyByteBuf buf, DebugInfoPacket packet) {
         buf.writeBlockPos(packet.pos);
         buf.writeUtf(packet.blockName);
         buf.writeDouble(packet.celsius);
@@ -40,11 +44,10 @@ public class DebugInfoPacket {
                 buf.readDouble());
     }
 
-    public static void handle(DebugInfoPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
+    public static void handle(DebugInfoPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
             ClientHeatCache.setDebugInfo(packet);
         });
-        ctx.get().setPacketHandled(true);
     }
 
     public BlockPos getPos() {

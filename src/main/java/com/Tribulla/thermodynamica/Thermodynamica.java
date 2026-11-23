@@ -8,20 +8,19 @@ import com.Tribulla.thermodynamica.debug.DebugRegistry;
 import com.Tribulla.thermodynamica.network.HeatNetwork;
 import com.Tribulla.thermodynamica.simulation.HeatSimulationManager;
 import com.Tribulla.thermodynamica.resource.ThermalPropertyResourceLoader;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.AddReloadListenerEvent;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.server.ServerAboutToStartEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -36,19 +35,18 @@ public class Thermodynamica {
     private final HeatAPIImpl heatApi;
     private HeatSimulationManager simulationManager;
 
-    public Thermodynamica() {
+    public Thermodynamica(IEventBus modBus) {
         instance = this;
-        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         this.configManager = new HeatConfigManager();
         this.heatApi = new HeatAPIImpl(configManager);
         HeatAPI.setInstance(heatApi);
 
         DebugRegistry.register(modBus);
-        HeatNetwork.register();
+        modBus.addListener(HeatNetwork::register);
 
         modBus.addListener(this::onCommonSetup);
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
 
         LOGGER.info("Thermodynamica heat library initialized");
     }
@@ -71,7 +69,7 @@ public class Thermodynamica {
         
         // Initialize targeting API with source provider
         HeatTargetingInternal.setSourceProvider((level, minCelsius) -> 
-            simulationManager.getActiveHeatSources(level.dimension().location(), minCelsius));
+            simulationManager.getActiveHeatSources(level.dimension().identifier(), minCelsius));
         
         LOGGER.info("Thermodynamica heat simulation engine started");
     }
@@ -85,9 +83,7 @@ public class Thermodynamica {
             net.minecraft.server.level.ServerLevel overworld = event.getServer().getLevel(net.minecraft.world.level.Level.OVERWORLD);
             if (overworld != null) {
                 com.Tribulla.thermodynamica.simulation.HeatSavedData data = overworld.getDataStorage().computeIfAbsent(
-                        (tag) -> com.Tribulla.thermodynamica.simulation.HeatSavedData.load(tag, simulationManager),
-                        () -> new com.Tribulla.thermodynamica.simulation.HeatSavedData(simulationManager),
-                        "thermodynamica_heat");
+                        com.Tribulla.thermodynamica.simulation.HeatSavedData.type(simulationManager));
                 simulationManager.setSavedData(data);
                 LOGGER.info("Thermodynamica saved data loaded (fallback path)");
             }
@@ -124,8 +120,10 @@ public class Thermodynamica {
     }
 
     @SubscribeEvent
-    public void onAddReloadListeners(AddReloadListenerEvent event) {
-        event.addListener(new ThermalPropertyResourceLoader(configManager.getThermalPropertiesRegistry()));
+    public void onAddReloadListeners(AddServerReloadListenersEvent event) {
+        event.addListener(
+                Identifier.fromNamespaceAndPath(MODID, "thermal_properties"),
+                new ThermalPropertyResourceLoader(configManager.getThermalPropertiesRegistry()));
         LOGGER.info("Thermodynamica resource reload listeners registered");
     }
 

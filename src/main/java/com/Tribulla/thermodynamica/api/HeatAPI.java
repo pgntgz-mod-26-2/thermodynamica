@@ -3,7 +3,7 @@ package com.Tribulla.thermodynamica.api;
 import com.Tribulla.thermodynamica.api.targeting.HeatTarget;
 import com.Tribulla.thermodynamica.api.targeting.HeatTargeting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -28,9 +28,9 @@ public abstract class HeatAPI {
         INSTANCE = instance;
     }
 
-    public abstract double getResolvedCelsius(ResourceLocation block, Level level, BlockPos pos);
+    public abstract double getResolvedCelsius(Identifier block, Level level, BlockPos pos);
 
-    public abstract double getBaseCelsiusForState(ResourceLocation block, net.minecraft.world.level.block.state.BlockState state);
+    public abstract double getBaseCelsiusForState(Identifier block, net.minecraft.world.level.block.state.BlockState state);
 
     public abstract OptionalDouble getSimulatedCelsius(Level level, BlockPos pos);
 
@@ -50,17 +50,17 @@ public abstract class HeatAPI {
 
     public abstract double getAmbientTemperature();
 
-    public abstract void registerBlockCelsius(ResourceLocation block, double celsius);
+    public abstract void registerBlockCelsius(Identifier block, double celsius);
 
     public abstract void onTemperatureChange(Consumer<TemperatureChangeEvent> listener);
 
-    public abstract ThermalProperties getThermalProperties(ResourceLocation block);
+    public abstract ThermalProperties getThermalProperties(Identifier block);
 
     public abstract double getBiomeOffset(Level level, BlockPos pos);
 
-    public abstract void registerEnergyOutputProvider(ResourceLocation block, EnergyOutputProvider provider);
+    public abstract void registerEnergyOutputProvider(Identifier block, EnergyOutputProvider provider);
 
-    public abstract void unregisterEnergyOutputProvider(ResourceLocation block);
+    public abstract void unregisterEnergyOutputProvider(Identifier block);
 
     public abstract void setBlockEnergyOutput(Level level, BlockPos pos, double celsius);
 

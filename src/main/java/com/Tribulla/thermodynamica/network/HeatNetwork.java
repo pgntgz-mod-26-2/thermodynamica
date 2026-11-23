@@ -1,38 +1,31 @@
 package com.Tribulla.thermodynamica.network;
 
 import com.Tribulla.thermodynamica.Thermodynamica;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class HeatNetwork {
 
-        private static final String PROTOCOL_VERSION = "2";
+    private static final String PROTOCOL_VERSION = "2";
 
-        public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-                        ResourceLocation.fromNamespaceAndPath(Thermodynamica.MODID, "main"),
-                        () -> PROTOCOL_VERSION,
-                        PROTOCOL_VERSION::equals,
-                        PROTOCOL_VERSION::equals);
+    public static void register(final RegisterPayloadHandlersEvent event) {
+        final PayloadRegistrar registrar = event.registrar(Thermodynamica.MODID).versioned(PROTOCOL_VERSION);
 
-        private static int id = 0;
+        registrar.playToClient(
+                HeatSyncPacket.TYPE,
+                HeatSyncPacket.STREAM_CODEC,
+                HeatSyncPacket::handle);
 
-        public static void register() {
-                CHANNEL.registerMessage(id++, HeatSyncPacket.class,
-                                HeatSyncPacket::encode,
-                                HeatSyncPacket::decode,
-                                HeatSyncPacket::handle);
+        registrar.playToClient(
+                ChunkHeatSyncPacket.TYPE,
+                ChunkHeatSyncPacket.STREAM_CODEC,
+                ChunkHeatSyncPacket::handle);
 
-                CHANNEL.registerMessage(id++, ChunkHeatSyncPacket.class,
-                                ChunkHeatSyncPacket::encode,
-                                ChunkHeatSyncPacket::decode,
-                                ChunkHeatSyncPacket::handle);
+        registrar.playToClient(
+                DebugInfoPacket.TYPE,
+                DebugInfoPacket.STREAM_CODEC,
+                DebugInfoPacket::handle);
 
-                CHANNEL.registerMessage(id++, DebugInfoPacket.class,
-                                DebugInfoPacket::encode,
-                                DebugInfoPacket::decode,
-                                DebugInfoPacket::handle);
-
-                Thermodynamica.LOGGER.debug("Network channel registered");
-        }
+        Thermodynamica.LOGGER.debug("Network payloads registered");
+    }
 }

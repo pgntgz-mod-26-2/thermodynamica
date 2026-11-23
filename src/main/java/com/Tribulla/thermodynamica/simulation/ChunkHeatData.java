@@ -1,7 +1,7 @@
 package com.Tribulla.thermodynamica.simulation;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.*;
@@ -14,7 +14,7 @@ public class ChunkHeatData {
 
     private final ChunkPos chunkPos;
     private final Long2DoubleMap temperatures = Long2DoubleMaps.synchronize(new Long2DoubleOpenHashMap());
-    private final ConcurrentHashMap<BlockPos, ResourceLocation> blockIds = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<BlockPos, Identifier> blockIds = new ConcurrentHashMap<>();
 
     public ChunkHeatData(ChunkPos chunkPos) {
         this.chunkPos = chunkPos;
@@ -42,18 +42,18 @@ public class ChunkHeatData {
         return temperatures;
     }
 
-    public ResourceLocation getBlockId(BlockPos pos) {
+    public Identifier getBlockId(BlockPos pos) {
         return blockIds.get(pos);
     }
 
-    public void setBlockId(BlockPos pos, ResourceLocation id) {
+    public void setBlockId(BlockPos pos, Identifier id) {
         blockIds.put(pos.immutable(), id);
     }
 
     public Map<BlockPos, Double> getEdgeTemperatures(ChunkPos neighborChunk, int radius) {
         Map<BlockPos, Double> result = new HashMap<>();
-        int dx = neighborChunk.x - chunkPos.x;
-        int dz = neighborChunk.z - chunkPos.z;
+        int dx = neighborChunk.x() - chunkPos.x();
+        int dz = neighborChunk.z() - chunkPos.z();
 
         for (Long2DoubleMap.Entry entry : temperatures.long2DoubleEntrySet()) {
             BlockPos pos = BlockPos.of(entry.getLongKey());

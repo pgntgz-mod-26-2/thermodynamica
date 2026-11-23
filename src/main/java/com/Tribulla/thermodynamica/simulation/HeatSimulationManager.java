@@ -17,12 +17,12 @@ import com.Tribulla.thermodynamica.config.SimulationSettings;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 public class HeatSimulationManager {
 
@@ -31,7 +31,7 @@ public class HeatSimulationManager {
     private final SimulationSettings settings;
     private final BFSHeatEngine engine;
 
-    private final ConcurrentHashMap<ResourceLocation, ConcurrentHashMap<Long, SourceInfo>> sourceIndex = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, ConcurrentHashMap<Long, SourceInfo>> sourceIndex = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<ChunkHeatKey, Set<Long>> chunkSourceIndex = new ConcurrentHashMap<>();
     private final Set<ChunkHeatKey> loadedChunks = ConcurrentHashMap.newKeySet();
 
@@ -109,7 +109,7 @@ public class HeatSimulationManager {
 
         for (Map.Entry<GlobalBlockPos, Double> entry : updates.entrySet()) {
             GlobalBlockPos globalPos = entry.getKey();
-            ResourceLocation dim = globalPos.getDimension();
+            Identifier dim = globalPos.getDimension();
             BlockPos pos = globalPos.getPos();
             long packed = pos.asLong();
             double celsius = entry.getValue();
@@ -128,7 +128,7 @@ public class HeatSimulationManager {
         while (it.hasNext()) {
             ChunkHeatKey key = it.next();
             ServerLevel level = getLevelForDim(key.getDimension());
-            if (level == null || !level.hasChunk(key.getChunkPos().x, key.getChunkPos().z)) {
+            if (level == null || !level.hasChunk(key.getChunkPos().x(), key.getChunkPos().z())) {
                 it.remove();
                 Set<Long> sourcesInChunk = chunkSourceIndex.remove(key);
                 if (sourcesInChunk != null) {
@@ -139,7 +139,7 @@ public class HeatSimulationManager {
                         engine.removeSource(key.getDimension(), packed);
                     }
                 }
-                engine.clearChunk(key.getDimension(), key.getChunkPos().x, key.getChunkPos().z);
+                engine.clearChunk(key.getDimension(), key.getChunkPos().x(), key.getChunkPos().z());
             }
         }
     }
@@ -152,8 +152,8 @@ public class HeatSimulationManager {
         if (apiImpl.getEnergyOutputProviders().isEmpty())
             return;
 
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, SourceInfo>> dimEntry : sourceIndex.entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, SourceInfo>> dimEntry : sourceIndex.entrySet()) {
+            Identifier dim = dimEntry.getKey();
             ServerLevel level = getLevelForDim(dim);
             if (level == null)
                 continue;
@@ -176,7 +176,7 @@ public class HeatSimulationManager {
                         continue;
 
                     BlockState state = level.getBlockState(pos);
-                    ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                    Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
                     if (blockId == null)
                         continue;
 
@@ -198,7 +198,7 @@ public class HeatSimulationManager {
         }
     }
 
-    private void updateSourceTemperature(ResourceLocation dim, long packed, double newCelsius) {
+    private void updateSourceTemperature(Identifier dim, long packed, double newCelsius) {
         ConcurrentHashMap<Long, SourceInfo> dimSources = sourceIndex.get(dim);
         if (dimSources != null) {
             SourceInfo old = dimSources.get(packed);
@@ -212,13 +212,13 @@ public class HeatSimulationManager {
     public double getTemperature(net.minecraft.world.level.Level level, BlockPos pos) {
         // Do NOT transform to world coords - VS2 blocks exist at ship-local coords
         // and level.getBlockState(shipLocalPos) returns the correct block
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         double biomeOffset = configManager.getBiomeConfig().getOffset(level.getBiome(pos));
         return engine.getTemperature(dim, pos.asLong()) + biomeOffset;
     }
 
     public OptionalDouble getExactTemperature(net.minecraft.world.level.Level level, BlockPos pos) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         OptionalDouble exact = engine.getExactTemperature(dim, pos.asLong());
         if (exact.isEmpty()) {
             return exact;
@@ -228,7 +228,7 @@ public class HeatSimulationManager {
     }
 
     public void setTemperature(net.minecraft.world.level.Level level, BlockPos pos, double celsius) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         double ambient = settings.getAmbientTemperature();
         long packed = pos.asLong();
 
@@ -240,17 +240,17 @@ public class HeatSimulationManager {
     }
 
     public void setTransientTemperature(net.minecraft.world.level.Level level, BlockPos pos, double celsius) {
-        transientUpdateQueue.put(new GlobalBlockPos(level.dimension().location(), pos), celsius);
+        transientUpdateQueue.put(new GlobalBlockPos(level.dimension().identifier(), pos), celsius);
     }
 
     public void onBlockChanged(net.minecraft.world.level.Level level, BlockPos pos) {
-        engine.onBlockChanged(level.dimension().location(), pos.asLong());
+        engine.onBlockChanged(level.dimension().identifier(), pos.asLong());
     }
 
     public void markActive(net.minecraft.world.level.Level level, BlockPos pos) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         BlockState state = level.getBlockState(pos);
-        ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         long packed = pos.asLong();
 
         double celsius = 0;
@@ -292,29 +292,29 @@ public class HeatSimulationManager {
     }
 
     public void markInactive(net.minecraft.world.level.Level level, BlockPos pos) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         unregisterSource(dim, pos, pos.asLong());
     }
 
-    private void registerSource(ResourceLocation dim, BlockPos pos, long packed, double celsius) {
+    private void registerSource(Identifier dim, BlockPos pos, long packed, double celsius) {
         ThermalProperties props = lookupThermalProps(dim, pos);
 
         sourceIndex.computeIfAbsent(dim, k -> new ConcurrentHashMap<>())
                 .put(packed, new SourceInfo(celsius, props.getConductivity(), props.getHeatCapacity()));
 
-        ChunkHeatKey chunkKey = new ChunkHeatKey(dim, new ChunkPos(pos));
+        ChunkHeatKey chunkKey = new ChunkHeatKey(dim, ChunkPos.containing(pos));
         chunkSourceIndex.computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet())
                 .add(packed);
 
         engine.addSource(dim, packed, celsius);
     }
 
-    private void unregisterSource(ResourceLocation dim, BlockPos pos, long packed) {
+    private void unregisterSource(Identifier dim, BlockPos pos, long packed) {
         ConcurrentHashMap<Long, SourceInfo> dimSources = sourceIndex.get(dim);
         if (dimSources != null)
             dimSources.remove(packed);
 
-        ChunkHeatKey chunkKey = new ChunkHeatKey(dim, new ChunkPos(pos));
+        ChunkHeatKey chunkKey = new ChunkHeatKey(dim, ChunkPos.containing(pos));
         Set<Long> chunkSet = chunkSourceIndex.get(chunkKey);
         if (chunkSet != null)
             chunkSet.remove(packed);
@@ -322,14 +322,14 @@ public class HeatSimulationManager {
         engine.removeSource(dim, packed);
     }
 
-    private ThermalProperties lookupThermalProps(ResourceLocation dim, BlockPos pos) {
+    private ThermalProperties lookupThermalProps(Identifier dim, BlockPos pos) {
         ServerLevel level = getLevelForDim(dim);
         if (level == null)
             return ThermalProperties.defaults();
 
         try {
             BlockState state = level.getBlockState(pos);
-            ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+            Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
             ThermalProperties props = configManager.getThermalPropertiesRegistry().get(blockId);
             return props != null ? props : ThermalProperties.defaults();
         } catch (Exception e) {
@@ -338,12 +338,12 @@ public class HeatSimulationManager {
     }
 
     public void onChunkLoad(ServerLevel level, net.minecraft.world.level.chunk.LevelChunk chunk) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         loadedChunks.add(new ChunkHeatKey(dim, chunk.getPos()));
     }
 
     public void onChunkUnload(ServerLevel level, net.minecraft.world.level.chunk.LevelChunk chunk) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         ChunkPos cp = chunk.getPos();
         ChunkHeatKey key = new ChunkHeatKey(dim, cp);
         loadedChunks.remove(key);
@@ -363,10 +363,10 @@ public class HeatSimulationManager {
                 engine.removeSource(dim, packed);
             }
         }
-        engine.clearChunk(dim, cp.x, cp.z);
+        engine.clearChunk(dim, cp.x(), cp.z());
     }
 
-    public Map<BlockPos, Double> getChunkTemperatures(ResourceLocation dim, int chunkX, int chunkZ) {
+    public Map<BlockPos, Double> getChunkTemperatures(Identifier dim, int chunkX, int chunkZ) {
         return engine.getChunkTemperatures(dim, chunkX, chunkZ);
     }
 
@@ -382,9 +382,9 @@ public class HeatSimulationManager {
         engine.loadFromNBT(tag);
         sourceIndex.clear();
         chunkSourceIndex.clear();
-        for (Map.Entry<ResourceLocation, ConcurrentHashMap<Long, Double>> dimEntry : engine.getSourceTemps()
+        for (Map.Entry<Identifier, ConcurrentHashMap<Long, Double>> dimEntry : engine.getSourceTemps()
                 .entrySet()) {
-            ResourceLocation dim = dimEntry.getKey();
+            Identifier dim = dimEntry.getKey();
             for (Map.Entry<Long, Double> cellEntry : dimEntry.getValue().entrySet()) {
                 long packed = cellEntry.getKey();
                 BlockPos p = BlockPos.of(packed);
@@ -392,7 +392,7 @@ public class HeatSimulationManager {
                 sourceIndex.computeIfAbsent(dim, k -> new ConcurrentHashMap<>())
                         .put(packed,
                                 new SourceInfo(cellEntry.getValue(), props.getConductivity(), props.getHeatCapacity()));
-                ChunkHeatKey chunkKey = new ChunkHeatKey(dim, new ChunkPos(p));
+                ChunkHeatKey chunkKey = new ChunkHeatKey(dim, ChunkPos.containing(p));
                 chunkSourceIndex.computeIfAbsent(chunkKey, k -> ConcurrentHashMap.newKeySet()).add(packed);
             }
         }
@@ -404,7 +404,7 @@ public class HeatSimulationManager {
 
     public ChunkHeatData getChunkData(ChunkHeatKey key) {
         Map<BlockPos, Double> temps = engine.getChunkTemperatures(
-                key.getDimension(), key.getChunkPos().x, key.getChunkPos().z);
+                key.getDimension(), key.getChunkPos().x(), key.getChunkPos().z());
         ChunkHeatData data = new ChunkHeatData(key.getChunkPos());
         for (Map.Entry<BlockPos, Double> entry : temps.entrySet()) {
             data.setTemperature(entry.getKey(), entry.getValue());
@@ -473,7 +473,7 @@ public class HeatSimulationManager {
         return (simTimeSeconds >= intervalSeconds) ? 1.0 / simTimeSeconds : 1.0 / intervalSeconds;
     }
 
-    public String getNearestSourceDebug(ResourceLocation dim, BlockPos pos) {
+    public String getNearestSourceDebug(Identifier dim, BlockPos pos) {
         ConcurrentHashMap<Long, SourceInfo> dimSources = sourceIndex.get(dim);
         if (dimSources == null || dimSources.isEmpty())
             return "No sources in dimension " + dim;
@@ -512,7 +512,7 @@ public class HeatSimulationManager {
      * @param minCelsius Minimum temperature threshold
      * @return Map of block positions to their temperatures
      */
-    public Map<BlockPos, Double> getActiveHeatSources(ResourceLocation dim, double minCelsius) {
+    public Map<BlockPos, Double> getActiveHeatSources(Identifier dim, double minCelsius) {
         ConcurrentHashMap<Long, SourceInfo> dimSources = sourceIndex.get(dim);
         if (dimSources == null || dimSources.isEmpty()) {
             return java.util.Collections.emptyMap();
@@ -528,9 +528,9 @@ public class HeatSimulationManager {
         return result;
     }
 
-    private ServerLevel getLevelForDim(ResourceLocation dim) {
+    private ServerLevel getLevelForDim(Identifier dim) {
         for (ServerLevel level : server.getAllLevels()) {
-            if (level.dimension().location().equals(dim))
+            if (level.dimension().identifier().equals(dim))
                 return level;
         }
         return null;

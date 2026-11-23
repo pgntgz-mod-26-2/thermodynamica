@@ -2,7 +2,7 @@ package com.Tribulla.thermodynamica.config;
 
 import com.Tribulla.thermodynamica.Thermodynamica;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biome;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -13,8 +13,8 @@ import java.util.Map;
 public class BiomeConfig implements ConfigSection {
 
     private final Map<String, Double> categoryOffsets = new HashMap<>();
-    private final Map<ResourceLocation, Double> biomeOverrides = new HashMap<>();
-    private final Map<ResourceLocation, String> biomeCategories = new HashMap<>();
+    private final Map<Identifier, Double> biomeOverrides = new HashMap<>();
+    private final Map<Identifier, String> biomeCategories = new HashMap<>();
     private double defaultOffset = 0.0;
 
     public BiomeConfig() {
@@ -43,7 +43,7 @@ public class BiomeConfig implements ConfigSection {
             for (Map.Entry<String, JsonElement> entry : assignments.entrySet()) {
                 if (entry.getKey().startsWith("_"))
                     continue;
-                ResourceLocation rl = ResourceLocation.tryParse(entry.getKey());
+                Identifier rl = Identifier.tryParse(entry.getKey());
                 if (rl != null) {
                     biomeCategories.put(rl, entry.getValue().getAsString());
                 }
@@ -55,7 +55,7 @@ public class BiomeConfig implements ConfigSection {
             for (Map.Entry<String, JsonElement> entry : overrides.entrySet()) {
                 if (entry.getKey().startsWith("_"))
                     continue;
-                ResourceLocation rl = ResourceLocation.tryParse(entry.getKey());
+                Identifier rl = Identifier.tryParse(entry.getKey());
                 if (rl != null) {
                     biomeOverrides.put(rl, entry.getValue().getAsDouble());
                 }
@@ -148,7 +148,7 @@ public class BiomeConfig implements ConfigSection {
 
     public double getOffset(Holder<Biome> biomeHolder) {
         if (biomeHolder.unwrapKey().isPresent()) {
-            ResourceLocation biomeId = biomeHolder.unwrapKey().get().location();
+            Identifier biomeId = biomeHolder.unwrapKey().get().identifier();
 
             Double override = biomeOverrides.get(biomeId);
             if (override != null)
@@ -182,7 +182,7 @@ public class BiomeConfig implements ConfigSection {
         return categoryOffsets;
     }
 
-    public Map<ResourceLocation, Double> getBiomeOverrides() {
+    public Map<Identifier, Double> getBiomeOverrides() {
         return biomeOverrides;
     }
 }

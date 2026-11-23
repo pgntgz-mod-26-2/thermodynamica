@@ -3,41 +3,41 @@ package com.Tribulla.thermodynamica.resource;
 import com.Tribulla.thermodynamica.Thermodynamica;
 import com.Tribulla.thermodynamica.api.ThermalProperties;
 import com.Tribulla.thermodynamica.config.ThermalPropertiesRegistry;
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.FileToIdConverter;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
+import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.profiling.ProfilerFiller;
 
 import java.util.Map;
 
-public class ThermalPropertyResourceLoader extends SimpleJsonResourceReloadListener {
-    private static final Gson GSON = new Gson();
+public class ThermalPropertyResourceLoader extends SimpleJsonResourceReloadListener<JsonElement> {
     private final ThermalPropertiesRegistry registry;
 
     public ThermalPropertyResourceLoader(ThermalPropertiesRegistry registry) {
-        super(GSON, "thermal_properties");
+        super(ExtraCodecs.JSON, FileToIdConverter.json("thermal_properties"));
         this.registry = registry;
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, JsonElement> object, ResourceManager resourceManager,
+    protected void apply(Map<Identifier, JsonElement> object, ResourceManager resourceManager,
             ProfilerFiller profiler) {
         // Since we don't have a clearSource for thermal properties yet, we'll just
         // overwrite
         // OR we should ideally add a way to clear them if they came from data packs.
 
-        for (Map.Entry<ResourceLocation, JsonElement> entry : object.entrySet()) {
-            ResourceLocation fileLocation = entry.getKey();
+        for (Map.Entry<Identifier, JsonElement> entry : object.entrySet()) {
+            Identifier fileLocation = entry.getKey();
             try {
                 JsonObject json = entry.getValue().getAsJsonObject();
 
                 if (json.has("blocks")) {
                     JsonObject blocks = json.getAsJsonObject("blocks");
                     for (Map.Entry<String, JsonElement> blockEntry : blocks.entrySet()) {
-                        ResourceLocation blockId = ResourceLocation.tryParse(blockEntry.getKey());
+                        Identifier blockId = Identifier.tryParse(blockEntry.getKey());
                         if (blockId != null) {
                             registry.registerOverride(blockId, parseProps(blockEntry.getValue().getAsJsonObject()));
                         }

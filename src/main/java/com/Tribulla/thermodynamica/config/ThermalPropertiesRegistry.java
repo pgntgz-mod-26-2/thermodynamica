@@ -3,7 +3,7 @@ package com.Tribulla.thermodynamica.config;
 import com.Tribulla.thermodynamica.api.ThermalProperties;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
@@ -11,9 +11,9 @@ import java.util.Map;
 
 public class ThermalPropertiesRegistry {
 
-    private final Map<ResourceLocation, ThermalProperties> blockProperties = new HashMap<>();
+    private final Map<Identifier, ThermalProperties> blockProperties = new HashMap<>();
     private final Map<String, ThermalProperties> tagProperties = new HashMap<>();
-    private final Map<ResourceLocation, ThermalProperties> runtimeOverrides = new HashMap<>();
+    private final Map<Identifier, ThermalProperties> runtimeOverrides = new HashMap<>();
 
     public void load(JsonObject json) {
         if (json.has("blocks")) {
@@ -21,7 +21,7 @@ public class ThermalPropertiesRegistry {
             for (Map.Entry<String, JsonElement> entry : blocks.entrySet()) {
                 if (entry.getKey().startsWith("_"))
                     continue;
-                ResourceLocation rl = ResourceLocation.tryParse(entry.getKey());
+                Identifier rl = Identifier.tryParse(entry.getKey());
                 if (rl != null) {
                     blockProperties.put(rl, parseProps(entry.getValue().getAsJsonObject()));
                 }
@@ -49,7 +49,7 @@ public class ThermalPropertiesRegistry {
     }
 
     @Nullable
-    public ThermalProperties get(ResourceLocation block) {
+    public ThermalProperties get(Identifier block) {
         ThermalProperties props = runtimeOverrides.get(block);
         if (props != null)
             return props;
@@ -59,7 +59,7 @@ public class ThermalPropertiesRegistry {
         return null;
     }
 
-    public void registerOverride(ResourceLocation block, ThermalProperties props) {
+    public void registerOverride(Identifier block, ThermalProperties props) {
         runtimeOverrides.put(block, props);
     }
 

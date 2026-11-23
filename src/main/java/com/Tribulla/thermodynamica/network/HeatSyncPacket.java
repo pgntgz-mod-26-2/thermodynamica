@@ -3,21 +3,26 @@ package com.Tribulla.thermodynamica.network;
 import com.Tribulla.thermodynamica.Thermodynamica;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.function.Supplier;
+public record HeatSyncPacket(BlockPos pos, double celsius) implements CustomPacketPayload {
 
-public class HeatSyncPacket {
+    public static final Type<HeatSyncPacket> TYPE = new Type<>(
+            Identifier.fromNamespaceAndPath(Thermodynamica.MODID, "heat_sync"));
 
-    private final BlockPos pos;
-    private final double celsius;
+    public static final StreamCodec<FriendlyByteBuf, HeatSyncPacket> STREAM_CODEC = StreamCodec.of(
+            HeatSyncPacket::encode,
+            HeatSyncPacket::decode);
 
-    public HeatSyncPacket(BlockPos pos, double celsius) {
-        this.pos = pos;
-        this.celsius = celsius;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public static void encode(HeatSyncPacket packet, FriendlyByteBuf buf) {
+    public static void encode(FriendlyByteBuf buf, HeatSyncPacket packet) {
         buf.writeBlockPos(packet.pos);
         buf.writeDouble(packet.celsius);
     }
@@ -28,11 +33,10 @@ public class HeatSyncPacket {
         return new HeatSyncPacket(pos, celsius);
     }
 
-    public static void handle(HeatSyncPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
+    public static void handle(HeatSyncPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
             ClientHeatCache.update(packet.pos, packet.celsius);
         });
-        ctx.get().setPacketHandled(true);
     }
 
     public BlockPos getPos() {

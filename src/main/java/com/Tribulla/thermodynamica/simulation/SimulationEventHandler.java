@@ -4,26 +4,25 @@ import com.Tribulla.thermodynamica.Thermodynamica;
 import com.Tribulla.thermodynamica.api.HeatAPI;
 import com.Tribulla.thermodynamica.api.ThermalProperties;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraft.world.level.Level;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-@Mod.EventBusSubscriber(modid = Thermodynamica.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = Thermodynamica.MODID)
 public class SimulationEventHandler {
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END)
-            return;
+    public static void onServerTick(ServerTickEvent.Post event) {
 
         Thermodynamica instance = Thermodynamica.getInstance();
         if (instance != null && instance.getSimulationManager() != null) {
@@ -69,7 +68,7 @@ public class SimulationEventHandler {
     }
 
     @SubscribeEvent
-    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+    public static void onBlockBreak(BreakBlockEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level))
             return;
 
@@ -104,7 +103,7 @@ public class SimulationEventHandler {
             return;
 
         HeatSimulationManager sim = instance.getSimulationManager();
-        ResourceLocation blockId = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         if (blockId == null)
             return;
 
@@ -124,9 +123,7 @@ public class SimulationEventHandler {
             Thermodynamica instance = Thermodynamica.getInstance();
             if (instance != null && instance.getSimulationManager() != null) {
                 HeatSavedData data = level.getDataStorage().computeIfAbsent(
-                        (tag) -> HeatSavedData.load(tag, instance.getSimulationManager()),
-                        () -> new HeatSavedData(instance.getSimulationManager()),
-                        "thermodynamica_heat");
+                        HeatSavedData.type(instance.getSimulationManager()));
                 instance.getSimulationManager().setSavedData(data);
             }
         }

@@ -1,31 +1,38 @@
 package com.Tribulla.thermodynamica.network;
 
+import com.Tribulla.thermodynamica.Thermodynamica;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
-public class ChunkHeatSyncPacket {
+public record ChunkHeatSyncPacket(ChunkPos chunkPos, Map<BlockPos, HeatData> temperatures) implements CustomPacketPayload {
+
+    public static final Type<ChunkHeatSyncPacket> TYPE = new Type<>(
+            Identifier.fromNamespaceAndPath(Thermodynamica.MODID, "chunk_heat_sync"));
+
+    public static final StreamCodec<FriendlyByteBuf, ChunkHeatSyncPacket> STREAM_CODEC = StreamCodec.of(
+            ChunkHeatSyncPacket::encode,
+            ChunkHeatSyncPacket::decode);
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
 
     public record HeatData(double celsius, BlockPos renderStatePos, Vec3 worldCenter) {
     }
 
-    private final ChunkPos chunkPos;
-    private final Map<BlockPos, HeatData> temperatures;
-
-    public ChunkHeatSyncPacket(ChunkPos chunkPos, Map<BlockPos, HeatData> temperatures) {
-        this.chunkPos = chunkPos;
-        this.temperatures = temperatures;
-    }
-
-    public static void encode(ChunkHeatSyncPacket packet, FriendlyByteBuf buf) {
-        buf.writeInt(packet.chunkPos.x);
-        buf.writeInt(packet.chunkPos.z);
+    public static void encode(FriendlyByteBuf buf, ChunkHeatSyncPacket packet) {
+        buf.writeInt(packet.chunkPos.x());
+        buf.writeInt(packet.chunkPos.z());
         buf.writeVarInt(packet.temperatures.size());
         for (Map.Entry<BlockPos, HeatData> entry : packet.temperatures.entrySet()) {
             buf.writeBlockPos(entry.getKey());
@@ -52,13 +59,12 @@ public class ChunkHeatSyncPacket {
         return new ChunkHeatSyncPacket(new ChunkPos(cx, cz), temps);
     }
 
-    public static void handle(ChunkHeatSyncPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
+    public static void handle(ChunkHeatSyncPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
             for (Map.Entry<BlockPos, HeatData> entry : packet.temperatures.entrySet()) {
                 HeatData data = entry.getValue();
                 ClientHeatCache.update(entry.getKey(), data.celsius(), data.renderStatePos(), data.worldCenter());
             }
         });
-        ctx.get().setPacketHandled(true);
     }
 }

@@ -7,7 +7,7 @@ import com.Tribulla.thermodynamica.simulation.HeatSimulationManager;
 import com.Tribulla.thermodynamica.simulation.GlobalBlockPos;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
@@ -26,7 +26,7 @@ public class HeatAPIImpl extends HeatAPI {
 
     private final HeatConfigManager configManager;
     private final List<Consumer<TemperatureChangeEvent>> tempChangeListeners = new CopyOnWriteArrayList<>();
-    private final ConcurrentHashMap<ResourceLocation, EnergyOutputProvider> energyOutputProviders = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, EnergyOutputProvider> energyOutputProviders = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<GlobalBlockPos, Double> perPositionOverrides = new ConcurrentHashMap<>();
     private volatile HeatSimulationManager simulationManager;
 
@@ -39,7 +39,7 @@ public class HeatAPIImpl extends HeatAPI {
     }
 
     @Override
-    public double getResolvedCelsius(ResourceLocation block, Level level, BlockPos pos) {
+    public double getResolvedCelsius(Identifier block, Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         double baseCelsius = getBaseCelsiusForState(block, state);
         double biomeOffset = getBiomeOffset(level, pos);
@@ -47,7 +47,7 @@ public class HeatAPIImpl extends HeatAPI {
     }
 
     @Override
-    public double getBaseCelsiusForState(ResourceLocation block, net.minecraft.world.level.block.state.BlockState state) {
+    public double getBaseCelsiusForState(Identifier block, net.minecraft.world.level.block.state.BlockState state) {
         ThermalProperties props = getThermalProperties(block);
         boolean hasExplicitTemp = props.getTemperature().isPresent();
         double baseCelsius = props.getTemperature().orElse(getAmbientTemperature());
@@ -126,14 +126,14 @@ public class HeatAPIImpl extends HeatAPI {
         if (simHeat.isPresent()) {
             return simHeat.getAsDouble();
         }
-        ResourceLocation blockId = level.getBlockState(pos).getBlock().builtInRegistryHolder().key().location();
+        Identifier blockId = level.getBlockState(pos).getBlock().builtInRegistryHolder().key().identifier();
         return getResolvedCelsius(blockId, level, pos);
     }
 
     @Override
     public Map<BlockPos, Double> getSimulatedSourcesInChunk(Level level, ChunkPos pos) {
         if (simulationManager != null) {
-            return simulationManager.getChunkTemperatures(level.dimension().location(), pos.x, pos.z);
+            return simulationManager.getChunkTemperatures(level.dimension().identifier(), pos.x(), pos.z());
         }
         return Collections.emptyMap();
     }
@@ -151,7 +151,7 @@ public class HeatAPIImpl extends HeatAPI {
     }
 
     @Override
-    public void registerBlockCelsius(ResourceLocation block, double celsius) {
+    public void registerBlockCelsius(Identifier block, double celsius) {
         ThermalProperties current = getThermalProperties(block);
         configManager.getThermalPropertiesRegistry().registerOverride(block, new ThermalProperties(
                 current.getConductivity(), current.getHeatCapacity(), current.getDissipationRate(), java.util.OptionalDouble.of(celsius)
@@ -174,7 +174,7 @@ public class HeatAPIImpl extends HeatAPI {
     }
 
     @Override
-    public ThermalProperties getThermalProperties(ResourceLocation block) {
+    public ThermalProperties getThermalProperties(Identifier block) {
         ThermalProperties props = configManager.getThermalPropertiesRegistry().get(block);
         return props != null ? props : ThermalProperties.defaults();
     }
@@ -188,26 +188,26 @@ public class HeatAPIImpl extends HeatAPI {
     @Override
     public Map<BlockPos, Double> getActiveHeatSources(Level level, double minCelsius) {
         if (simulationManager != null) {
-            return simulationManager.getActiveHeatSources(level.dimension().location(), minCelsius);
+            return simulationManager.getActiveHeatSources(level.dimension().identifier(), minCelsius);
         }
         return Collections.emptyMap();
     }
 
     @Override
-    public void registerEnergyOutputProvider(ResourceLocation block, EnergyOutputProvider provider) {
+    public void registerEnergyOutputProvider(Identifier block, EnergyOutputProvider provider) {
         energyOutputProviders.put(block, provider);
         Thermodynamica.LOGGER.debug("Registered energy output provider for {}", block);
     }
 
     @Override
-    public void unregisterEnergyOutputProvider(ResourceLocation block) {
+    public void unregisterEnergyOutputProvider(Identifier block) {
         energyOutputProviders.remove(block);
         Thermodynamica.LOGGER.debug("Unregistered energy output provider for {}", block);
     }
 
     @Override
     public void setBlockEnergyOutput(Level level, BlockPos pos, double celsius) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         GlobalBlockPos key = new GlobalBlockPos(dim, pos.asLong());
         perPositionOverrides.put(key, celsius);
 
@@ -219,7 +219,7 @@ public class HeatAPIImpl extends HeatAPI {
 
     @Override
     public void clearBlockEnergyOutput(Level level, BlockPos pos) {
-        ResourceLocation dim = level.dimension().location();
+        Identifier dim = level.dimension().identifier();
         GlobalBlockPos key = new GlobalBlockPos(dim, pos.asLong());
         perPositionOverrides.remove(key);
 
@@ -230,16 +230,16 @@ public class HeatAPIImpl extends HeatAPI {
     }
 
     @Nullable
-    public EnergyOutputProvider getEnergyOutputProvider(ResourceLocation block) {
+    public EnergyOutputProvider getEnergyOutputProvider(Identifier block) {
         return energyOutputProviders.get(block);
     }
 
     @Nullable
-    public Double getPerPositionOverride(ResourceLocation dim, long packedPos) {
+    public Double getPerPositionOverride(Identifier dim, long packedPos) {
         return perPositionOverrides.get(new GlobalBlockPos(dim, packedPos));
     }
 
-    public Map<ResourceLocation, EnergyOutputProvider> getEnergyOutputProviders() {
+    public Map<Identifier, EnergyOutputProvider> getEnergyOutputProviders() {
         return Collections.unmodifiableMap(energyOutputProviders);
     }
 }

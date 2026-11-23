@@ -1,20 +1,20 @@
 package com.Tribulla.thermodynamica.simulation;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.Objects;
 
 public class ChunkHeatKey {
-    final ResourceLocation dimension;
+    final Identifier dimension;
     final ChunkPos chunkPos;
 
-    public ChunkHeatKey(ResourceLocation dimension, ChunkPos chunkPos) {
+    public ChunkHeatKey(Identifier dimension, ChunkPos chunkPos) {
         this.dimension = dimension;
         this.chunkPos = chunkPos;
     }
 
-    public ResourceLocation getDimension() {
+    public Identifier getDimension() {
         return dimension;
     }
 
@@ -38,6 +38,6 @@ public class ChunkHeatKey {
 
     @Override
     public String toString() {
-        return dimension + "@[" + chunkPos.x + "," + chunkPos.z + "]";
+        return dimension + "@[" + chunkPos.x() + "," + chunkPos.z() + "]";
     }
 }

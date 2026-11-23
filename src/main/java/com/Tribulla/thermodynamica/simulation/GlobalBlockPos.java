@@ -1,25 +1,25 @@
 package com.Tribulla.thermodynamica.simulation;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.Objects;
 
 public class GlobalBlockPos {
-    final ResourceLocation dimension;
+    final Identifier dimension;
     final BlockPos pos;
 
-    public GlobalBlockPos(ResourceLocation dimension, BlockPos pos) {
+    public GlobalBlockPos(Identifier dimension, BlockPos pos) {
         this.dimension = dimension;
         this.pos = pos.immutable();
     }
 
-    public GlobalBlockPos(ResourceLocation dimension, long packedPos) {
+    public GlobalBlockPos(Identifier dimension, long packedPos) {
         this.dimension = dimension;
         this.pos = BlockPos.of(packedPos).immutable();
     }
 
-    public ResourceLocation getDimension() {
+    public Identifier getDimension() {
         return dimension;
     }
 

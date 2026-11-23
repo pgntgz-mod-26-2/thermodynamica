@@ -200,7 +200,7 @@ public final class HeatTargeting {
                 worldFrom, worldTo,
                 ClipContext.Block.COLLIDER,
                 ClipContext.Fluid.NONE,
-                null
+                net.minecraft.world.phys.shapes.CollisionContext.empty()
         );
 
         BlockHitResult result = level.clip(context);
